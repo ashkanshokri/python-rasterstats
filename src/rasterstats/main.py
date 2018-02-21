@@ -287,7 +287,7 @@ def gen_zonal_stats(
 
             if 'Point' in geom.type:
                 geom = boxify_points(geom, rast)
-                percent_cover = False
+                percent_cover = percent_cover_weighting = False
 
 
             # -----------------------------------------------------------------
