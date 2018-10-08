@@ -75,8 +75,16 @@ def split_geom(geom, limit, pixel_size, origin):
     # bounds format: minx, miny, maxx, maxy
     true_minx, true_miny, true_maxx, true_maxy = tuple(geom.bounds)
 
-    init_dim = math.floor(math.sqrt(limit))
-    pixel_step = init_dim * pixel_size
+    # rough pixel check for full geom to avoid work when not needed
+    x_est = math.floor(true_maxx - true_minx) / pixel_size
+    y_est = math.floor(true_maxy - true_miny) / pixel_size
+    total_pixel_estimate = x_est * y_est
+    if total_pixel_estimate < limit:
+        yield geom
+
+    # step size for splits in terms of pixels and degree
+    step_size_pixels = math.floor(math.sqrt(limit))
+    step_size_deg = step_size_pixels * pixel_size
 
     # pixel adjustment to offset edges slightly
     # prevents overlap issues with rasterization
@@ -85,13 +93,12 @@ def split_geom(geom, limit, pixel_size, origin):
     # round true top left reference points to align with raster grid
     base_minx, base_maxy = round_to_grid((true_minx, true_maxy), origin, pixel_size)
 
-    # init value one row above true bounding box
-    # so row loop can iterate without additional checks
-    base_maxy = base_maxy + pixel_step * 2
+    # init value one row/col outside true bounding box to avoid edge clip
+    base_maxy = base_maxy + pixel_size
+    base_minx = base_minx - pixel_size
 
     maxy = copy(base_maxy)
-
-    base_minx = base_minx - pixel_step * 2
+    miny = maxy - step_size_deg
 
     # end after final row
     while maxy > true_miny:
@@ -99,16 +106,11 @@ def split_geom(geom, limit, pixel_size, origin):
         # reset minx each loop
         # init value one col to left of true bounding box
         # so col loop can iterate without additional checks
-        minx = copy(base_minx) #- pixel_step
-
-        maxy = maxy - pixel_step
-        miny = maxy - pixel_step
+        minx = copy(base_minx) #- step_size_deg
+        maxx = minx + step_size_deg
 
         # reset after final col for each row
         while minx < true_maxx:
-
-            minx = minx + pixel_step
-            maxx = minx + pixel_step
 
             tmp_box = box(minx+pa, miny+pa, maxx-pa, maxy-pa)
             tmp_geom = geom.intersection(tmp_box)
@@ -119,6 +121,12 @@ def split_geom(geom, limit, pixel_size, origin):
             # used to read in proper extents of split geom
             if tmp_geom.area > 0:
                 yield tmp_geom
+
+            minx = minx + step_size_deg
+            maxx = maxx + step_size_deg
+
+        maxy = maxy - step_size_deg
+        miny = miny - step_size_deg
 
 
 def rasterize_geom(geom, shape, affine, all_touched=False):
