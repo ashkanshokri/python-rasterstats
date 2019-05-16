@@ -76,57 +76,57 @@ def split_geom(geom, limit, pixel_size, origin):
     true_minx, true_miny, true_maxx, true_maxy = tuple(geom.bounds)
 
     # rough pixel check for full geom to avoid work when not needed
-    x_est = math.floor(true_maxx - true_minx) / pixel_size
-    y_est = math.floor(true_maxy - true_miny) / pixel_size
+    x_est = math.floor((true_maxx - true_minx) / pixel_size)
+    y_est = math.floor((true_maxy - true_miny) / pixel_size)
     total_pixel_estimate = x_est * y_est
     if total_pixel_estimate < limit:
         yield geom
+    else:
+        # step size for splits in terms of pixels and degree
+        step_size_pixels = math.floor(math.sqrt(limit))
+        step_size_deg = step_size_pixels * pixel_size
 
-    # step size for splits in terms of pixels and degree
-    step_size_pixels = math.floor(math.sqrt(limit))
-    step_size_deg = step_size_pixels * pixel_size
+        # pixel adjustment to offset edges slightly
+        # prevents overlap issues with rasterization
+        pa = pixel_size * 0.000001
 
-    # pixel adjustment to offset edges slightly
-    # prevents overlap issues with rasterization
-    pa = pixel_size * 0.000001
+        # round true top left reference points to align with raster grid
+        base_minx, base_maxy = round_to_grid((true_minx, true_maxy), origin, pixel_size)
 
-    # round true top left reference points to align with raster grid
-    base_minx, base_maxy = round_to_grid((true_minx, true_maxy), origin, pixel_size)
+        # init value one row/col outside true bounding box to avoid edge clip
+        base_maxy = base_maxy + pixel_size
+        base_minx = base_minx - pixel_size
 
-    # init value one row/col outside true bounding box to avoid edge clip
-    base_maxy = base_maxy + pixel_size
-    base_minx = base_minx - pixel_size
+        maxy = copy(base_maxy)
+        miny = maxy - step_size_deg
 
-    maxy = copy(base_maxy)
-    miny = maxy - step_size_deg
+        # end after final row
+        while maxy > true_miny:
 
-    # end after final row
-    while maxy > true_miny:
+            # reset minx each loop
+            # init value one col to left of true bounding box
+            # so col loop can iterate without additional checks
+            minx = copy(base_minx) #- step_size_deg
+            maxx = minx + step_size_deg
 
-        # reset minx each loop
-        # init value one col to left of true bounding box
-        # so col loop can iterate without additional checks
-        minx = copy(base_minx) #- step_size_deg
-        maxx = minx + step_size_deg
+            # reset after final col for each row
+            while minx < true_maxx:
 
-        # reset after final col for each row
-        while minx < true_maxx:
+                tmp_box = box(minx+pa, miny+pa, maxx-pa, maxy-pa)
+                tmp_geom = geom.intersection(tmp_box)
 
-            tmp_box = box(minx+pa, miny+pa, maxx-pa, maxy-pa)
-            tmp_geom = geom.intersection(tmp_box)
+                # check geom intersection to validate but only return
+                # box since we are just using it to read raster window.
+                # the shape/affine from raster instance  will then be
+                # used to read in proper extents of split geom
+                if tmp_geom.area > 0:
+                    yield tmp_geom
 
-            # check geom intersection to validate but only return
-            # box since we are just using it to read raster window.
-            # the shape/affine from raster instance  will then be
-            # used to read in proper extents of split geom
-            if tmp_geom.area > 0:
-                yield tmp_geom
+                minx = minx + step_size_deg
+                maxx = maxx + step_size_deg
 
-            minx = minx + step_size_deg
-            maxx = maxx + step_size_deg
-
-        maxy = maxy - step_size_deg
-        miny = miny - step_size_deg
+            maxy = maxy - step_size_deg
+            miny = miny - step_size_deg
 
 
 def rasterize_geom(geom, shape, affine, all_touched=False):
