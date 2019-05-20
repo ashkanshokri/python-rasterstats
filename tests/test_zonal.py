@@ -618,11 +618,21 @@ def test_geom_split_main():
     stats3 = zonal_stats(polygons, raster, limit=50, stats=all_valid_limit_stats)
 
 
+def test_no_use_geom_split_categorical():
+    polygons = os.path.join(DATA, 'polygons.shp')
+    categorical_raster = os.path.join(DATA, 'slope_classes.tif')
+    stats1 = zonal_stats(polygons, categorical_raster, categorical=True, all_touched=True)
+    stats2 = zonal_stats(polygons, categorical_raster, categorical=True, all_touched=True, limit=9999999999999999999)
+    assert len(stats1) == len(stats2) == 2
+    assert stats1[0][1.0] == stats2[0][1.0]  == 95
+    assert 5.0 in stats1[1] and 5.0 in stats2[1]
+
+
 def test_geom_split_categorical():
     polygons = os.path.join(DATA, 'polygons.shp')
     categorical_raster = os.path.join(DATA, 'slope_classes.tif')
     stats1 = zonal_stats(polygons, categorical_raster, categorical=True, all_touched=True)
-    stats2 = zonal_stats(polygons, categorical_raster, percent_cover_weighting=True, categorical=True, limit=50, all_touched=True)
+    stats2 = zonal_stats(polygons, categorical_raster, categorical=True, all_touched=True, limit=50)
     assert len(stats1) == len(stats2) == 2
     assert stats1[0][1.0] == stats2[0][1.0]  == 95
     assert 5.0 in stats1[1] and 5.0 in stats2[1]
@@ -659,4 +669,3 @@ def test_geodataframe_zonal():
 
     expected = zonal_stats(polygons, raster)
     assert zonal_stats(df, raster) == expected
-
