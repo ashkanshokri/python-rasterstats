@@ -472,7 +472,7 @@ def gen_zonal_stats(
                         feature_stats['count'] = sum([i['count'] for i in sub_feature_stats_list])
 
                     if 'sum' in stats:
-                        vals = [i['sum'] for i in sub_feature_stats_list if i['sum']]
+                        vals = [i['sum'] for i in sub_feature_stats_list if 'sum' in i]
                         feature_stats['sum'] = sum(vals) if vals else None
 
                     if 'mean' in stats:
