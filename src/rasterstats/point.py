@@ -3,7 +3,7 @@ from __future__ import division
 from shapely.geometry import shape
 from shapely import wkt
 from numpy.ma import masked
-from numpy import asscalar
+from numpy import ndarray
 from .io import read_features, Raster
 
 
@@ -57,7 +57,7 @@ def bilinear(arr, x, y):
         if val is masked:
             return None
         else:
-            return asscalar(val)
+            return ndarray.item(val)
 
     # bilinear interp on unit square
     return ((llv * (1 - x) * (1 - y)) +
@@ -178,7 +178,7 @@ def gen_point_query(
                     if val is masked:
                         vals.append(None)
                     else:
-                        vals.append(asscalar(val))
+                        vals.append(ndarray.item(val))
 
                 elif interpolate == 'bilinear':
                     window, unitxy = point_window_unitxy(x, y, rast.affine)
