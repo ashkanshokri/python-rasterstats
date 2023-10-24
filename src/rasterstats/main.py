@@ -5,12 +5,45 @@ import numpy as np
 import warnings
 from copy import copy
 from affine import Affine
+from . import io
 from shapely.geometry import shape
 from .io import read_features, Raster
 from .utils import (rasterize_geom, get_percentile, check_stats,
                     remap_categories, key_assoc_val, boxify_points,
                     rasterize_pctcover_geom, get_latitude_scale,
                     split_geom, VALID_STATS)
+
+def zonal_stats_timeseries(vector, da, *args, dim='time', method='sum', **kwargs):
+    """
+    
+    """
+
+    dim_idx = np.where(np.array(da.dims) != 'time')[0]
+    dim_idx = dim_idx.astype(int)
+    
+    affine = da.rio.transform()
+    raster = da.isel(**{dim:0}).values
+    o = zonal_stats(vector, raster, affine=affine, states=method,percent_cover_weighting=True, raster_out=True, **kwargs)
+    print('.')
+    nodata = o[0]['nodata']
+    band = o[0]['band']
+    rast = io.Raster(da.values, affine, nodata, band)
+    l = []
+    for v in o:        
+        fsrc = rast.read(bounds=v['sub_geom_bounds']).array
+        mask = np.broadcast_to(v['mini_raster_array'].mask, fsrc.shape)
+        masked = np.ma.MaskedArray(fsrc, mask=mask)
+        if method=='sum':
+            arr = masked * v['cover_weights']         
+            l.append(arr.sum(axis=tuple(dim_idx)).data)
+        elif method=='mean':
+            arr = masked * v['cover_weights']     
+            tmp_numerator = arr.sum(axis=tuple(dim_idx))
+            tmp_denominator = (~arr.mask * v['cover_weights']).sum(axis=tuple(dim_idx))
+            l.append((tmp_numerator / tmp_denominator).data)
+           
+    return l
+
 
 
 def raster_stats(*args, **kwargs):
@@ -310,7 +343,7 @@ def gen_zonal_stats(
                 sub_geom_bounds = tuple(sub_geom_box.bounds)
 
                 fsrc = rast.read(bounds=sub_geom_bounds)
-
+                
 
                 # rasterized geometry
                 if percent_cover:
@@ -340,7 +373,11 @@ def gen_zonal_stats(
                 masked = np.ma.MaskedArray(
                     fsrc.array,
                     mask=(isnodata | ~rv_array))
-
+                
+                if fsrc.array.shape[0]>200000:
+                    print(fsrc.array)
+                    
+                    assert False
                 # execute zone_func on masked zone ndarray
                 if zone_func is not None:
                     if not callable(zone_func):
@@ -455,6 +492,11 @@ def gen_zonal_stats(
                     sub_feature_stats['mini_raster_array'] = masked
                     sub_feature_stats['mini_raster_affine'] = fsrc.affine
                     sub_feature_stats['mini_raster_nodata'] = fsrc.nodata
+                    sub_feature_stats['cover_weights'] = cover_weights
+                    sub_feature_stats['sub_geom_box'] = sub_geom_box
+                    sub_feature_stats['sub_geom_bounds'] = sub_geom_bounds
+                    sub_feature_stats['nodata'] = nodata
+                    sub_feature_stats['band'] = band
 
 
                 # -----------------------------------------------------------------
