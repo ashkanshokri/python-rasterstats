@@ -13,7 +13,13 @@ from .utils import (rasterize_geom, get_percentile, check_stats,
                     rasterize_pctcover_geom, get_latitude_scale,
                     split_geom, VALID_STATS)
 
-def zonal_stats_timeseries(vector, da, *args, dim='time', method='sum', return_coverage=False, coverage=None, **kwargs):
+
+def get_coverage(vector, da, dim='time', method='sum', **kwargs):
+    affine = da.rio.transform()
+    raster = da.isel(**{dim:0}).values
+    return zonal_stats(vector, raster, affine=affine, states=method,percent_cover_weighting=True, raster_out=True, **kwargs)
+
+def zonal_stats_timeseries(da, method='sum', return_coverage=False, coverage=None):
     """
     
     """
@@ -22,12 +28,9 @@ def zonal_stats_timeseries(vector, da, *args, dim='time', method='sum', return_c
     dim_idx = dim_idx.astype(int)
     
     affine = da.rio.transform()
-    raster = da.isel(**{dim:0}).values
-    
-    if coverage is None:
-        o = zonal_stats(vector, raster, affine=affine, states=method,percent_cover_weighting=True, raster_out=True, **kwargs)
-    else:
-        o = coverage
+    #raster = da.isel(**{dim:0}).values
+    o = coverage
+
 
     nodata = o[0]['nodata']
     band = o[0]['band']
